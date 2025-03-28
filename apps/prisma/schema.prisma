@@ -1,0 +1,100 @@
+// prisma/schema.prisma
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id                 Int             @id @default(autoincrement())
+  username           String          @unique
+  email              String          @unique
+  passwordHash       String
+  profilePictureUrl  String?
+  createdAt          DateTime        @default(now())
+  lastLogin          DateTime?
+  groups             GroupMember[]
+  articles           Article[]
+  createdGroups      Group[]
+}
+
+model Group {
+  id            Int             @id @default(autoincrement())
+  name          String
+  description   String?
+  creator       User            @relation(fields: [creatorId], references: [id])
+  creatorId     Int
+  createdAt     DateTime        @default(now())
+  isPrivate     Boolean         @default(false)
+  members       GroupMember[]
+  articles      Article[]
+  newspapers    NewspaperEdition[]
+}
+
+model GroupMember {
+  id        Int       @id @default(autoincrement())
+  group     Group     @relation(fields: [groupId], references: [id])
+  groupId   Int
+  user      User      @relation(fields: [userId], references: [id])
+  userId    Int
+  role      String
+  joinedAt  DateTime  @default(now())
+
+  @@unique([groupId, userId])
+}
+
+model Article {
+  id              Int                 @id @default(autoincrement())
+  group           Group               @relation(fields: [groupId], references: [id])
+  groupId         Int
+  author          User                @relation(fields: [authorId], references: [id])
+  authorId        Int
+  title           String
+  content         String
+  status          String
+  submissionDate  DateTime            @default(now())
+  publicationDate DateTime?
+  isFeatured      Boolean             @default(false)
+  editions        NewspaperEditionArticle[]
+}
+
+model NewspaperEdition {
+  id              Int                 @id @default(autoincrement())
+  group           Group               @relation(fields: [groupId], references: [id])
+  groupId         Int
+  publicationDate DateTime
+  totalArticles   Int                 @default(0)
+  compiledPdfUrl  String?
+  articles        NewspaperEditionArticle[]
+
+  @@unique([groupId, publicationDate])
+}
+
+model NewspaperEditionArticle {
+  edition   NewspaperEdition @relation(fields: [editionId], references: [id])
+  editionId Int
+  article   Article          @relation(fields: [articleId], references: [id])
+  articleId Int
+
+  @@id([editionId, articleId])
+}
+
+// database.js
+import { PrismaClient } from '@prisma/client'
+
+const prisma = new PrismaClient()
+
+export async function connectToDatabase() {
+  try {
+    await prisma.$connect()
+    console.log('Successfully connected to PostgreSQL database')
+  } catch (error) {
+    console.error('Failed to connect to database:', error)
+    process.exit(1)
+  }
+}
+
+export default prisma
